@@ -1,0 +1,54 @@
+# Copy to C:\garm\config\garm-provider-hyperv.toml. VM names below were
+# verified on host HZVM; replace credential, checkpoint, and OS-version values.
+# Do not commit the password, private-key, or known_hosts files.
+
+# PowerShell Direct account on Windows11Runner. It must be a local
+# administrator; its password file contains exactly the password.
+windows_guest_username = "REPLACE-WINDOWS-ADMINISTRATOR-USERNAME"
+windows_guest_password_file = "C:\\garm\\secrets\\windows11-runner-password.txt"
+
+# powershell.exe is the Windows PowerShell shipped with Hyper-V. ssh.exe is
+# the OpenSSH client already present on this host.
+powershell_path = "powershell.exe"
+ssh_path = "ssh.exe"
+lock_timeout_seconds = 60
+
+# This must be no larger than GARM's runner_bootstrap_timeout.
+bootstrap_timeout_seconds = 900
+
+# The checkpoint is restored before every allocation. It must already exist and
+# be a clean, powered-off baseline with no registered GitHub runner.
+[[vm]]
+name = "Ubuntu22Runner"
+checkpoint = "garm-clean"
+# Set disabled = true while a guest is under maintenance; it remains in the
+# required three-guest inventory but is not selected for new allocations.
+# disabled = true
+os_type = "linux"
+os_name = "ubuntu"
+os_version = "22.04"
+os_arch = "amd64"
+ssh_username = "REPLACE-LINUX-RUNNER-USERNAME"
+ssh_private_key_file = "C:\\garm\\secrets\\ubuntu22-runner-ed25519"
+ssh_known_hosts_file = "C:\\garm\\secrets\\ubuntu22-known_hosts"
+ssh_port = 22
+
+[[vm]]
+name = "Ubuntu24Runner"
+checkpoint = "garm-clean"
+os_type = "linux"
+os_name = "ubuntu"
+os_version = "24.04"
+os_arch = "amd64"
+ssh_username = "REPLACE-LINUX-RUNNER-USERNAME"
+ssh_private_key_file = "C:\\garm\\secrets\\ubuntu24-runner-ed25519"
+ssh_known_hosts_file = "C:\\garm\\secrets\\ubuntu24-known_hosts"
+ssh_port = 22
+
+[[vm]]
+name = "Windows11Runner"
+checkpoint = "garm-clean"
+os_type = "windows"
+os_name = "windows"
+os_version = "11"
+os_arch = "amd64"
