@@ -1,7 +1,9 @@
 # Copy to <GARM_ROOT>\config\garm-provider-hyperv.toml, replacing every <GARM_ROOT>
 # placeholder below with your GARM installation root (C:\garm on the reference host).
-# VM names below were verified on host HZVM; replace credential, checkpoint, and
-# OS-version values. Do not commit the password, private-key, or known_hosts files.
+# One [[vm]] block per guest: add or remove blocks freely (the provider accepts any
+# number >= 1), and each name must match an actual Hyper-V VM. VM names below were
+# verified on host HZVM; replace credential, checkpoint, and OS-version values. Do
+# not commit the password, private-key, or known_hosts files.
 
 # powershell.exe is the Windows PowerShell shipped with Hyper-V. ssh.exe is
 # the OpenSSH client already present on this host.
@@ -18,7 +20,7 @@ bootstrap_timeout_seconds = 900
 name = "Ubuntu22Runner"
 checkpoint = "garm-clean"
 # Set disabled = true while a guest is under maintenance; it remains in the
-# required three-guest inventory but is not selected for new allocations.
+# configured inventory but is not selected for new allocations.
 # disabled = true
 os_type = "linux"
 os_name = "ubuntu"

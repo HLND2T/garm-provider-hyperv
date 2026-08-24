@@ -7,7 +7,12 @@ param(
     [string]$ProviderExecutable = $env:GARM_PROVIDER_EXECUTABLE,
     # Require a Go toolchain on PATH. Only relevant when building from source;
     # a downloaded pre-built release does not need Go.
-    [switch]$RequireGo
+    [switch]$RequireGo,
+    # Expected guests to verify: a path to a JSON file (array of
+    # {"Name": "...", "OSType": "linux|windows"} objects) or inline JSON.
+    # Defaults to the three reference guests; any number of guests is
+    # supported, and names must match actual Hyper-V VMs.
+    [string]$ExpectedGuests = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,11 +23,25 @@ if (-not $ProviderExecutable) {
         $ProviderExecutable = Join-Path $PSScriptRoot "..\bin\garm-provider-hyperv.exe"
     }
 }
-$expectedVMs = @(
+$defaultExpectedVMs = @(
     @{ Name = "Ubuntu22Runner"; OSType = "linux" },
     @{ Name = "Ubuntu24Runner"; OSType = "linux" },
     @{ Name = "Windows11Runner"; OSType = "windows" }
 )
+
+$expectedVMs = $defaultExpectedVMs
+if ($ExpectedGuests) {
+    $source = if (Test-Path -LiteralPath $ExpectedGuests) {
+        Get-Content -LiteralPath $ExpectedGuests -Raw
+    } else {
+        $ExpectedGuests
+    }
+    # Windows PowerShell's ConvertFrom-Json emits a JSON array as a single
+    # pipeline item, so a bare @(...) would nest it. ForEach-Object forces
+    # each guest out as its own item; a one-element array or a single object
+    # still yields exactly one guest.
+    $expectedVMs = @(($source | ConvertFrom-Json) | ForEach-Object { $_ })
+}
 
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = [Security.Principal.WindowsPrincipal]::new($identity)

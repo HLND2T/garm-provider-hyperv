@@ -1,6 +1,6 @@
 # GARM Hyper-V fixed-guest provider
 
-This is a Windows-hosted [GARM external provider](https://github.com/cloudbase/garm/blob/main/doc/external_provider.md) for exactly three pre-created Hyper-V guests: Ubuntu22Runner, Ubuntu24Runner, and Windows11Runner.
+This is a Windows-hosted [GARM external provider](https://github.com/cloudbase/garm/blob/main/doc/external_provider.md) for a fixed set of pre-created Hyper-V guests. The reference deployment uses three — Ubuntu22Runner, Ubuntu24Runner, and Windows11Runner — but the provider is guest-agnostic: it serves any number of guests listed in its configuration, and guest names are read from config rather than hardcoded.
 
 It intentionally does **not** create or delete virtual machines or VHDX files.
 On idle reclamation GARM invokes DeleteInstance; this provider calls
@@ -214,7 +214,7 @@ v0.1.1.
 
 From the repository root,
 [scripts/preflight.ps1](scripts/preflight.ps1) verifies that the session is
-elevated, the provider executable exists, and each of the three guests is idle,
+elevated, the provider executable exists, and each configured guest is idle,
 has key-value exchange enabled, and has its baseline checkpoint:
 
 ```powershell
@@ -226,7 +226,9 @@ exits non-zero when anything is wrong. Pass `-CheckpointName` if your baseline
 checkpoints are not named `garm-clean`, `-ProviderExecutable` (or
 `$env:GARM_PROVIDER_EXECUTABLE`) to check a different executable, and
 `-RequireGo` to also enforce that Go is on PATH (only relevant when building
-from source).
+from source). By default it expects the three reference guests; pass
+`-ExpectedGuests` (a JSON file path or inline JSON array of `{"Name", "OSType"}`
+objects) to check a different guest set.
 
 ### 7. Create runner pools
 
@@ -252,7 +254,7 @@ Get-VM -Name '<one configured VM>' | Select-Object Name,State,Notes
 Then create one test pool runner and confirm the provider returns the
 configured VM name as ProviderID, the guest reports runner bootstrap status to
 GARM, and idle cleanup leaves the VM in Saved or Paused state after
-Suspend-VM. Do not test RemoveAllInstances until the three entries and
+Suspend-VM. Do not test RemoveAllInstances until all configured entries and
 checkpoints are confirmed: it suspends every guest currently allocated to this
 controller.
 

@@ -12,8 +12,6 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-const expectedGuestCount = 3
-
 // Config describes a fixed-capacity set of Hyper-V guests. A guest is never
 // deleted by this provider. It is suspended on idle reclamation and restored
 // from its named baseline checkpoint before its next allocation.
@@ -60,8 +58,8 @@ func NewConfig(path string) (*Config, error) {
 }
 
 func (c *Config) Validate() error {
-	if len(c.VMs) != expectedGuestCount {
-		return fmt.Errorf("this fixed-capacity provider requires exactly %d vm entries, got %d", expectedGuestCount, len(c.VMs))
+	if len(c.VMs) == 0 {
+		return fmt.Errorf("this fixed-capacity provider requires at least one vm entry")
 	}
 
 	names := make(map[string]struct{}, len(c.VMs))

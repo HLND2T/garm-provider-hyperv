@@ -7,7 +7,7 @@
 [[provider]]
 name = "hyperv_fixed"
 provider_type = "external"
-description = "Three checkpointed Windows Hyper-V guests; idle guests are suspended"
+description = "A fixed set of checkpointed Windows Hyper-V guests; idle guests are suspended"
 
 [provider.external]
 provider_executable = "<GARM_ROOT>\\providers\\garm-provider-hyperv.exe"

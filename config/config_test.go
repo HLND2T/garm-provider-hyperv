@@ -12,21 +12,12 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-func TestConfigValidateRequiresExactlyThreeGuests(t *testing.T) {
-	passwordFile := filepath.Join(t.TempDir(), "guest-password.txt")
-	if err := os.WriteFile(passwordFile, []byte("secret\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	cfg := Config{
-		VMs: []VM{
-			{Name: "runner-01", Checkpoint: "garm-clean", OSType: "windows", WindowsGuestUsername: "Administrator", WindowsGuestPasswordFile: passwordFile},
-			{Name: "runner-02", Checkpoint: "garm-clean", OSType: "windows", WindowsGuestUsername: "Administrator", WindowsGuestPasswordFile: passwordFile},
-		},
-	}
+func TestConfigValidateRequiresAtLeastOneGuest(t *testing.T) {
+	cfg := Config{}
 
 	err := cfg.Validate()
-	if err == nil || !strings.Contains(err.Error(), "exactly 3") {
-		t.Fatalf("Validate() error = %v, want exact guest-count error", err)
+	if err == nil || !strings.Contains(err.Error(), "at least one") {
+		t.Fatalf("Validate() error = %v, want guest-count error", err)
 	}
 }
 
@@ -68,8 +59,8 @@ func TestExampleFilesUseValidTOML(t *testing.T) {
 	if _, err := toml.DecodeFile(filepath.Join("..", "examples", "garm-provider-hyperv.toml"), &providerConfig); err != nil {
 		t.Fatalf("parse provider example: %v", err)
 	}
-	if len(providerConfig.VMs) != expectedGuestCount {
-		t.Fatalf("provider example guest count = %d, want %d", len(providerConfig.VMs), expectedGuestCount)
+	if len(providerConfig.VMs) == 0 {
+		t.Fatalf("provider example guest count = %d, want at least one", len(providerConfig.VMs))
 	}
 
 	var garmFragment map[string]any
