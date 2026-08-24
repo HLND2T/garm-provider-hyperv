@@ -128,11 +128,11 @@ func (p *HyperV) CreateInstance(ctx context.Context, bootstrap commonParams.Boot
 			if err != nil {
 				return fmt.Errorf("render Windows runner bootstrap script: %w", err)
 			}
-			password, err := p.cfg.WindowsPassword()
+			username, password, err := p.cfg.WindowsCredentials(vmCfg)
 			if err != nil {
 				return err
 			}
-			if err := p.client.BootstrapWindowsGuest(bootstrapCtx, vm.Name, p.cfg.WindowsGuestUsername, password, script); err != nil {
+			if err := p.client.BootstrapWindowsGuest(bootstrapCtx, vm.Name, username, password, script); err != nil {
 				return fmt.Errorf("bootstrap Windows guest %q: %w", vm.Name, err)
 			}
 		case commonParams.Linux:

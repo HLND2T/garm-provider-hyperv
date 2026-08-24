@@ -18,13 +18,11 @@ const expectedGuestCount = 3
 // deleted by this provider. It is suspended on idle reclamation and restored
 // from its named baseline checkpoint before its next allocation.
 type Config struct {
-	WindowsGuestUsername     string `toml:"windows_guest_username"`
-	WindowsGuestPasswordFile string `toml:"windows_guest_password_file"`
-	PowerShellPath           string `toml:"powershell_path"`
-	SSHPath                  string `toml:"ssh_path"`
-	LockTimeoutSeconds       int    `toml:"lock_timeout_seconds"`
-	BootstrapTimeoutSeconds  int    `toml:"bootstrap_timeout_seconds"`
-	VMs                      []VM   `toml:"vm"`
+	PowerShellPath          string `toml:"powershell_path"`
+	SSHPath                 string `toml:"ssh_path"`
+	LockTimeoutSeconds      int    `toml:"lock_timeout_seconds"`
+	BootstrapTimeoutSeconds int    `toml:"bootstrap_timeout_seconds"`
+	VMs                     []VM   `toml:"vm"`
 }
 
 // VM is one pre-provisioned guest available to GARM.
@@ -33,15 +31,17 @@ type VM struct {
 	Checkpoint string `toml:"checkpoint"`
 	// Disabled keeps a guest in the fixed inventory without making it eligible
 	// for new allocations. It is intended for temporary guest maintenance.
-	Disabled          bool   `toml:"disabled"`
-	OSType            string `toml:"os_type"`
-	OSName            string `toml:"os_name"`
-	OSVersion         string `toml:"os_version"`
-	OSArch            string `toml:"os_arch"`
-	SSHUsername       string `toml:"ssh_username"`
-	SSHPrivateKeyFile string `toml:"ssh_private_key_file"`
-	SSHKnownHostsFile string `toml:"ssh_known_hosts_file"`
-	SSHPort           int    `toml:"ssh_port"`
+	Disabled                 bool   `toml:"disabled"`
+	OSType                   string `toml:"os_type"`
+	OSName                   string `toml:"os_name"`
+	OSVersion                string `toml:"os_version"`
+	OSArch                   string `toml:"os_arch"`
+	WindowsGuestUsername     string `toml:"windows_guest_username"`
+	WindowsGuestPasswordFile string `toml:"windows_guest_password_file"`
+	SSHUsername              string `toml:"ssh_username"`
+	SSHPrivateKeyFile        string `toml:"ssh_private_key_file"`
+	SSHKnownHostsFile        string `toml:"ssh_known_hosts_file"`
+	SSHPort                  int    `toml:"ssh_port"`
 }
 
 func NewConfig(path string) (*Config, error) {
@@ -61,7 +61,6 @@ func (c *Config) Validate() error {
 	}
 
 	names := make(map[string]struct{}, len(c.VMs))
-	hasWindowsGuest := false
 	for _, vm := range c.VMs {
 		if strings.TrimSpace(vm.Name) == "" {
 			return fmt.Errorf("vm name is required")
@@ -75,7 +74,12 @@ func (c *Config) Validate() error {
 		}
 		switch vm.OSType {
 		case "windows":
-			hasWindowsGuest = true
+			if vm.WindowsGuestUsername == "" {
+				return fmt.Errorf("windows vm %q requires windows_guest_username", vm.Name)
+			}
+			if err := validateFile("windows_guest_password_file", vm.WindowsGuestPasswordFile); err != nil {
+				return fmt.Errorf("windows vm %q: %w", vm.Name, err)
+			}
 		case "linux":
 			if vm.SSHUsername == "" {
 				return fmt.Errorf("linux vm %q requires ssh_username", vm.Name)
@@ -95,19 +99,22 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("vm %q has unsupported os_arch %q; only amd64 guests are supported", vm.Name, vm.OSArch)
 		}
 	}
-	if hasWindowsGuest {
-		if c.WindowsGuestUsername == "" {
-			return fmt.Errorf("windows_guest_username is required for PowerShell Direct bootstrap")
-		}
-		if err := validateFile("windows_guest_password_file", c.WindowsGuestPasswordFile); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
-func (c *Config) WindowsPassword() (string, error) {
-	data, err := os.ReadFile(c.WindowsGuestPasswordFile)
+func (c *Config) WindowsCredentials(vm VM) (string, string, error) {
+	if vm.WindowsGuestUsername == "" {
+		return "", "", fmt.Errorf("windows vm %q requires windows_guest_username", vm.Name)
+	}
+	password, err := readWindowsPassword(vm.WindowsGuestPasswordFile)
+	if err != nil {
+		return "", "", err
+	}
+	return vm.WindowsGuestUsername, password, nil
+}
+
+func readWindowsPassword(passwordFile string) (string, error) {
+	data, err := os.ReadFile(passwordFile)
 	if err != nil {
 		return "", fmt.Errorf("read windows_guest_password_file: %w", err)
 	}

@@ -210,13 +210,11 @@ func testProvider(t *testing.T, client *fakeClient) *HyperV {
 		t.Fatal(err)
 	}
 	provider := newHyperVProvider(&config.Config{
-		WindowsGuestUsername:     "Administrator",
-		WindowsGuestPasswordFile: passwordFile,
-		BootstrapTimeoutSeconds:  10,
+		BootstrapTimeoutSeconds: 10,
 		VMs: []config.VM{
-			{Name: "runner-01", Checkpoint: "garm-clean", OSType: "windows"},
-			{Name: "runner-02", Checkpoint: "garm-clean", OSType: "windows"},
-			{Name: "runner-03", Checkpoint: "garm-clean", OSType: "windows"},
+			{Name: "runner-01", Checkpoint: "garm-clean", OSType: "windows", WindowsGuestUsername: "Administrator", WindowsGuestPasswordFile: passwordFile},
+			{Name: "runner-02", Checkpoint: "garm-clean", OSType: "windows", WindowsGuestUsername: "Administrator", WindowsGuestPasswordFile: passwordFile},
+			{Name: "runner-03", Checkpoint: "garm-clean", OSType: "windows", WindowsGuestUsername: "Administrator", WindowsGuestPasswordFile: passwordFile},
 		},
 	}, "controller-a", client)
 	provider.toolFetch = func(commonParams.OSType, commonParams.OSArch, []commonParams.RunnerApplicationDownload) (commonParams.RunnerApplicationDownload, error) {

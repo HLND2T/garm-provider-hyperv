@@ -52,11 +52,12 @@ Get-VMCheckpoint -VMName * |
 1. Copy [examples/garm-provider-hyperv.toml](examples/garm-provider-hyperv.toml)
    to C:\garm\config\garm-provider-hyperv.toml; the three confirmed VM names
    are already filled in. Substitute credentials and checkpoint names.
-2. Write the Windows11Runner administrator password to
-   C:\garm\secrets\windows11-runner-password.txt and restrict its NTFS ACL to
-   the GARM service account. Add each Ubuntu private key and matching pinned
+2. Write the Windows11Runner administrator password to the file referenced by
+   that guest's `windows_guest_password_file` setting and restrict its NTFS ACL
+   to the GARM service account. Set `windows_guest_username` beside it in the
+   same `[[vm]]` entry. Add each Ubuntu private key and matching pinned
    known_hosts file at the paths in the template. These files must not be
-   checked in or put in config.toml.
+   checked in.
 3. Copy [examples/garm-provider.fragment.toml](examples/garm-provider.fragment.toml)
    into the GARM config.toml and adjust paths only if GARM lives elsewhere.
 4. Create Linux/amd64 pools for the two Ubuntu Guests and a Windows/amd64 pool

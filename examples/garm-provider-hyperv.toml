@@ -2,11 +2,6 @@
 # verified on host HZVM; replace credential, checkpoint, and OS-version values.
 # Do not commit the password, private-key, or known_hosts files.
 
-# PowerShell Direct account on Windows11Runner. It must be a local
-# administrator; its password file contains exactly the password.
-windows_guest_username = "REPLACE-WINDOWS-ADMINISTRATOR-USERNAME"
-windows_guest_password_file = "C:\\garm\\secrets\\windows11-runner-password.txt"
-
 # powershell.exe is the Windows PowerShell shipped with Hyper-V. ssh.exe is
 # the OpenSSH client already present on this host.
 powershell_path = "powershell.exe"
@@ -52,3 +47,5 @@ os_type = "windows"
 os_name = "windows"
 os_version = "11"
 os_arch = "amd64"
+windows_guest_username = "REPLACE-WINDOWS-ADMINISTRATOR-USERNAME"
+windows_guest_password_file = "C:\\garm\\secrets\\windows11-runner-password.txt"

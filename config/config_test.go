@@ -18,11 +18,9 @@ func TestConfigValidateRequiresExactlyThreeGuests(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := Config{
-		WindowsGuestUsername:     "Administrator",
-		WindowsGuestPasswordFile: passwordFile,
 		VMs: []VM{
-			{Name: "runner-01", Checkpoint: "garm-clean", OSType: "windows"},
-			{Name: "runner-02", Checkpoint: "garm-clean", OSType: "windows"},
+			{Name: "runner-01", Checkpoint: "garm-clean", OSType: "windows", WindowsGuestUsername: "Administrator", WindowsGuestPasswordFile: passwordFile},
+			{Name: "runner-02", Checkpoint: "garm-clean", OSType: "windows", WindowsGuestUsername: "Administrator", WindowsGuestPasswordFile: passwordFile},
 		},
 	}
 
@@ -37,14 +35,31 @@ func TestConfigPasswordPreservesSpaces(t *testing.T) {
 	if err := os.WriteFile(passwordFile, []byte(" secret value \r\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	cfg := Config{WindowsGuestPasswordFile: passwordFile}
+	cfg := Config{VMs: []VM{{Name: "runner-01", WindowsGuestUsername: "Administrator", WindowsGuestPasswordFile: passwordFile}}}
 
-	password, err := cfg.WindowsPassword()
+	_, password, err := cfg.WindowsCredentials(cfg.VMs[0])
 	if err != nil {
 		t.Fatal(err)
 	}
 	if password != " secret value " {
 		t.Fatalf("WindowsPassword() = %q, want surrounding spaces retained", password)
+	}
+}
+
+func TestConfigValidateRequiresWindowsCredentialsOnVM(t *testing.T) {
+	passwordFile := filepath.Join(t.TempDir(), "guest-password.txt")
+	if err := os.WriteFile(passwordFile, []byte("secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Config{VMs: []VM{
+		{Name: "runner-01", Checkpoint: "garm-clean", OSType: "windows", WindowsGuestUsername: "Administrator", WindowsGuestPasswordFile: passwordFile},
+		{Name: "runner-02", Checkpoint: "garm-clean", OSType: "windows", WindowsGuestUsername: "Administrator"},
+		{Name: "runner-03", Checkpoint: "garm-clean", OSType: "windows", WindowsGuestUsername: "Administrator", WindowsGuestPasswordFile: passwordFile},
+	}}
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "runner-02") || !strings.Contains(err.Error(), "windows_guest_password_file") {
+		t.Fatalf("Validate() error = %v, want runner-02 password-file error", err)
 	}
 }
 
