@@ -4,7 +4,10 @@ param(
     # Provider executable to verify, taken from $env:GARM_PROVIDER_EXECUTABLE when unset.
     # Falls back to <GARM_ROOT>\providers\garm-provider-hyperv.exe when $env:GARM_ROOT is
     # set, otherwise ..\bin\garm-provider-hyperv.exe next to this script.
-    [string]$ProviderExecutable = $env:GARM_PROVIDER_EXECUTABLE
+    [string]$ProviderExecutable = $env:GARM_PROVIDER_EXECUTABLE,
+    # Require a Go toolchain on PATH. Only relevant when building from source;
+    # a downloaded pre-built release does not need Go.
+    [switch]$RequireGo
 )
 
 $ErrorActionPreference = "Stop"
@@ -69,7 +72,7 @@ $results = foreach ($expected in $expectedVMs) {
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     $issues.Add("the current process is not elevated")
 }
-if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
+if ($RequireGo -and -not (Get-Command go -ErrorAction SilentlyContinue)) {
     $issues.Add("Go is not on PATH")
 }
 if (-not (Test-Path -LiteralPath $ProviderExecutable)) {

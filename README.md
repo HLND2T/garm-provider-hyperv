@@ -86,10 +86,15 @@ New-Item -ItemType Directory -Force -Path "$env:GARM_ROOT\secrets"   | Out-Null
 The repository itself does not need to live under `<GARM_ROOT>`; only the built
 executable and its configuration do. Never commit any file from `secrets\`.
 
-### 2. Get the source and build the provider
+### 2. Get the provider executable
+
+Choose one of the two options below. Both produce
+`<GARM_ROOT>\providers\garm-provider-hyperv.exe`.
+
+#### Option A — build from source
 
 Install Go 1.26.2 or newer on the Windows host and clone this repository
-anywhere on disk, then build into `<GARM_ROOT>\providers\`:
+anywhere on disk, then build:
 
 ```powershell
 Set-Location <repo>\garm-provider-hyperv
@@ -100,6 +105,37 @@ Set-Location <repo>\garm-provider-hyperv
 `<GARM_ROOT>\providers\garm-provider-hyperv.exe`. Without `-GarmRoot` the
 default output is `bin\garm-provider-hyperv.exe` inside the repo;
 `-OutputPath` overrides both.
+
+#### Option B — download a pre-built release
+
+No Go toolchain or source checkout is required. Download the executable from a
+[GitHub release](https://github.com/HLND2T/garm-provider-hyperv/releases)
+directly to `<GARM_ROOT>\providers\`:
+
+```powershell
+$version = "v0.1.0"   # pin a version, or use "latest"
+Invoke-WebRequest -UseBasicParsing `
+  -Uri "https://github.com/HLND2T/garm-provider-hyperv/releases/download/$version/garm-provider-hyperv.exe" `
+  -OutFile "$env:GARM_ROOT\providers\garm-provider-hyperv.exe"
+```
+
+Each release also ships `garm-provider-hyperv-windows-amd64.zip`, which bundles
+the executable together with the example configs and `preflight.ps1`. Download
+and extract it when you are not cloning the repository, since steps 3 and 6
+otherwise reference files inside the repo checkout:
+
+```powershell
+$version = "v0.1.0"
+$zip = "$env:TEMP\garm-provider-hyperv-windows-amd64.zip"
+Invoke-WebRequest -UseBasicParsing `
+  -Uri "https://github.com/HLND2T/garm-provider-hyperv/releases/download/$version/garm-provider-hyperv-windows-amd64.zip" `
+  -OutFile $zip
+Expand-Archive -Path $zip -DestinationPath "$env:TEMP\garm-provider-hyperv" -Force
+Copy-Item "$env:TEMP\garm-provider-hyperv\garm-provider-hyperv.exe" "$env:GARM_ROOT\providers\"
+```
+
+The extracted config and preflight files are then under
+`$env:TEMP\garm-provider-hyperv\`.
 
 ### 3. Configure the provider
 
@@ -178,9 +214,8 @@ v0.1.1.
 
 From the repository root,
 [scripts/preflight.ps1](scripts/preflight.ps1) verifies that the session is
-elevated, Go is on PATH, the provider executable exists, and each of the three
-guests is idle, has key-value exchange enabled, and has its baseline
-checkpoint:
+elevated, the provider executable exists, and each of the three guests is idle,
+has key-value exchange enabled, and has its baseline checkpoint:
 
 ```powershell
 .\scripts\preflight.ps1
@@ -188,8 +223,10 @@ checkpoint:
 
 It prints a JSON report with `Ready: true`/`false` and the list of issues, and
 exits non-zero when anything is wrong. Pass `-CheckpointName` if your baseline
-checkpoints are not named `garm-clean`, and `-ProviderExecutable` (or
-`$env:GARM_PROVIDER_EXECUTABLE`) to check a different executable.
+checkpoints are not named `garm-clean`, `-ProviderExecutable` (or
+`$env:GARM_PROVIDER_EXECUTABLE`) to check a different executable, and
+`-RequireGo` to also enforce that Go is on PATH (only relevant when building
+from source).
 
 ### 7. Create runner pools
 
