@@ -39,20 +39,6 @@ func TestTransientSSHBootstrapFailure(t *testing.T) {
 	}
 }
 
-func TestPrepareLinuxGuestBootstrapScriptCreatesGARMRunnerAccount(t *testing.T) {
-	script := prepareLinuxGuestBootstrapScript("printf ready")
-	for _, want := range []string{
-		"id -u runner",
-		"useradd --create-home --shell /bin/bash --user-group runner",
-		"install -d -m 0755 -o runner -g runner /home/runner",
-		"printf ready",
-	} {
-		if !strings.Contains(script, want) {
-			t.Fatalf("prepared script does not contain %q: %q", want, script)
-		}
-	}
-}
-
 func TestRedactBootstrapOutput(t *testing.T) {
 	input := "BEARER_TOKEN=secret.value-1\nAuthorization: Bearer another.secret-2\nready"
 	got := redactBootstrapOutput(input)

@@ -31,8 +31,6 @@ type windowsClient struct {
 var setExecutionPolicyCommand = regexp.MustCompile(`(?mi)^[^\r\n]*\bSet-ExecutionPolicy\b[^\r\n]*(?:\r?\n|$)`)
 var bootstrapCredentialValue = regexp.MustCompile(`(?i)(BEARER_TOKEN=|Authorization:\s*Bearer\s+)([A-Za-z0-9._~-]+)`)
 
-const garmLinuxRunnerAccount = "runner"
-
 func newWindowsClient(cfg *config.Config) (Client, error) {
 	return &windowsClient{
 		powerShellPath: cfg.PowerShell(),
@@ -228,7 +226,6 @@ func sanitizeWindowsBootstrapScript(script string) string {
 }
 
 func (c *windowsClient) BootstrapLinuxGuest(ctx context.Context, address string, port int, username, privateKeyFile, knownHostsFile, script string) error {
-	script = prepareLinuxGuestBootstrapScript(script)
 	for {
 		command := exec.CommandContext(ctx, c.sshPath,
 			"-p", strconv.Itoa(port),
@@ -263,16 +260,6 @@ func (c *windowsClient) BootstrapLinuxGuest(ctx context.Context, address string,
 		case <-timer.C:
 		}
 	}
-}
-
-func prepareLinuxGuestBootstrapScript(script string) string {
-	return fmt.Sprintf(`set -e
-if ! id -u %[1]s >/dev/null 2>&1; then
-    useradd --create-home --shell /bin/bash --user-group %[1]s
-fi
-install -d -m 0755 -o %[1]s -g %[1]s /home/%[1]s
-
-%s`, garmLinuxRunnerAccount, script)
 }
 
 func redactBootstrapOutput(output string) string {
