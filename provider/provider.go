@@ -96,8 +96,16 @@ func (p *HyperV) CreateInstance(ctx context.Context, bootstrap commonParams.Boot
 
 		// Restoring the baseline precedes metadata assignment: VM checkpoints include
 		// settings such as Notes and would otherwise erase the allocation marker.
-		if err := p.client.PrepareForAllocation(ctx, vm.Name, vmCfg.Checkpoint); err != nil {
-			return fmt.Errorf("prepare guest %q from checkpoint %q: %w", vm.Name, vmCfg.Checkpoint, err)
+		// A guest configured with skip_checkpoint_restore keeps its current disk
+		// state (for example build artifacts) and is resumed/started in place.
+		if vmCfg.SkipCheckpointRestore {
+			if err := p.client.ResumeOrStart(ctx, vm.Name); err != nil {
+				return fmt.Errorf("start guest %q without checkpoint restore: %w", vm.Name, err)
+			}
+		} else {
+			if err := p.client.PrepareForAllocation(ctx, vm.Name, vmCfg.Checkpoint); err != nil {
+				return fmt.Errorf("prepare guest %q from checkpoint %q: %w", vm.Name, vmCfg.Checkpoint, err)
+			}
 		}
 		prepared, err := p.vmByName(ctx, vm.Name)
 		if err != nil {

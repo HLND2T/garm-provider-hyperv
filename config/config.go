@@ -29,6 +29,10 @@ type Config struct {
 type VM struct {
 	Name       string `toml:"name"`
 	Checkpoint string `toml:"checkpoint"`
+	// SkipCheckpointRestore keeps the guest's current disk state across
+	// allocations instead of restoring the baseline checkpoint. Use it to
+	// preserve data (for example build artifacts) on the guest between runs.
+	SkipCheckpointRestore bool `toml:"skip_checkpoint_restore"`
 	// Disabled keeps a guest in the fixed inventory without making it eligible
 	// for new allocations. It is intended for temporary guest maintenance.
 	Disabled                 bool   `toml:"disabled"`
