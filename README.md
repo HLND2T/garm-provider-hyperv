@@ -47,45 +47,177 @@ Get-VMCheckpoint -VMName * |
   Select-Object VMName,Name,CheckpointType,CreationTime
 ```
 
-## Configure
+## Installation
 
-1. Copy [examples/garm-provider-hyperv.toml](examples/garm-provider-hyperv.toml)
-   to C:\garm\config\garm-provider-hyperv.toml; the three confirmed VM names
-   are already filled in. Substitute credentials and checkpoint names.
-2. Write the Windows11Runner administrator password to the file referenced by
-   that guest's `windows_guest_password_file` setting and restrict its NTFS ACL
-   to the GARM service account. Set `windows_guest_username` beside it in the
-   same `[[vm]]` entry. Add each Ubuntu private key and matching pinned
-   known_hosts file at the paths in the template. These files must not be
-   checked in.
-3. Copy [examples/garm-provider.fragment.toml](examples/garm-provider.fragment.toml)
-   into the GARM config.toml and adjust paths only if GARM lives elsewhere.
-4. Create Linux/amd64 pools for the two Ubuntu Guests and a Windows/amd64 pool
-   for Windows11Runner, all using provider_name hyperv_fixed. Set each
-   runner_bootstrap_timeout to at least 900 seconds. Keep it greater than or
-   equal to bootstrap_timeout_seconds and exec_timeout_seconds.
-
-Each VM's existing human-readable Notes text is preserved. The provider adds a
-short JSON allocation marker while GARM owns the guest, then removes only that
-marker after a successful Suspend-VM.
-
-The provider passes the bootstrap script, GARM callback token, and guest
-credential to the host-side process over standard input. They are not encoded
-into a PowerShell or SSH command line.
-
-## Build
-
-Install Go 1.26.2 or newer on the Windows host, then run in an elevated
-PowerShell:
+All commands below run in an elevated PowerShell session on the physical
+Hyper-V host. `<GARM_ROOT>` denotes your GARM installation root — this guide
+uses `C:\garm`, but any path works. Set it once per session; `build.ps1`,
+`preflight.ps1`, and the verification steps below all honour it:
 
 ```powershell
-Set-Location C:\garm\garm-provider-hyperv
-.\build.ps1 -Version v0.1.0
+$env:GARM_ROOT = "C:\garm"
 ```
 
-The executable is written to C:\garm\providers\garm-provider-hyperv.exe.
-The project uses GARM external-provider interface v0.1.0; do not set
-interface_version to v0.1.1 in the GARM provider configuration.
+### 1. Expected directory structure
+
+The provider executable, its configuration, and its secrets live together
+under `<GARM_ROOT>`. Create the tree with:
+
+```powershell
+New-Item -ItemType Directory -Force -Path "$env:GARM_ROOT\config"    | Out-Null
+New-Item -ItemType Directory -Force -Path "$env:GARM_ROOT\providers" | Out-Null
+New-Item -ItemType Directory -Force -Path "$env:GARM_ROOT\secrets"   | Out-Null
+```
+
+```text
+<GARM_ROOT>\                               e.g. C:\garm
+├─ config\
+│  └─ garm-provider-hyperv.toml            provider configuration (from examples/)
+├─ providers\
+│  └─ garm-provider-hyperv.exe             built provider executable
+└─ secrets\                                readable only by the GARM service account
+   ├─ ubuntu22-runner-ed25519              Ubuntu 22.04 private key
+   ├─ ubuntu22-known_hosts                 Ubuntu 22.04 pinned SSH host key
+   ├─ ubuntu24-runner-ed25519              Ubuntu 24.04 private key
+   ├─ ubuntu24-known_hosts                 Ubuntu 24.04 pinned SSH host key
+   └─ windows11-runner-password.txt        Windows 11 administrator password
+```
+
+The repository itself does not need to live under `<GARM_ROOT>`; only the built
+executable and its configuration do. Never commit any file from `secrets\`.
+
+### 2. Get the source and build the provider
+
+Install Go 1.26.2 or newer on the Windows host and clone this repository
+anywhere on disk, then build into `<GARM_ROOT>\providers\`:
+
+```powershell
+Set-Location <repo>\garm-provider-hyperv
+.\build.ps1 -GarmRoot $env:GARM_ROOT -Version v0.1.0
+```
+
+`build.ps1` uses `-GarmRoot` (or `$env:GARM_ROOT`) to write the executable to
+`<GARM_ROOT>\providers\garm-provider-hyperv.exe`. Without `-GarmRoot` the
+default output is `bin\garm-provider-hyperv.exe` inside the repo;
+`-OutputPath` overrides both.
+
+### 3. Configure the provider
+
+Copy the example configuration into the tree and edit it:
+
+```powershell
+Copy-Item .\examples\garm-provider-hyperv.toml `
+  "$env:GARM_ROOT\config\garm-provider-hyperv.toml"
+notepad "$env:GARM_ROOT\config\garm-provider-hyperv.toml"
+```
+
+In the copy, replace every `<GARM_ROOT>` placeholder with your actual root
+(for example `C:\garm` — the template keeps `<GARM_ROOT>\secrets\...` intact
+for every guest). The three VM entries are pre-filled with the confirmed guest
+names; substitute:
+
+- `ssh_username` / `windows_guest_username` with the real guest accounts;
+- `checkpoint` if your baseline checkpoints are named differently;
+- `os_version` / `os_arch` if a guest differs from the defaults;
+- the credential paths only if you store secrets elsewhere.
+
+`bootstrap_timeout_seconds` must not exceed the `runner_bootstrap_timeout` you
+configure in GARM (step 7).
+
+The provider passes the bootstrap script, GARM callback token, and guest
+credential to the host-side process over standard input. They are never
+encoded into a PowerShell or SSH command line.
+
+### 4. Install guest credentials
+
+For each Ubuntu guest, generate a dedicated SSH key pair and add the public
+half to the runner user's `authorized_keys`. Copy the private key to
+`secrets\ubuntu22-runner-ed25519` (and `ubuntu24-runner-ed25519`).
+
+Each Ubuntu guest's `known_hosts` file pins its SSH host key. Capture it while
+the guest is temporarily running — before you take the clean checkpoint:
+
+```powershell
+ssh-keyscan -t ed25519 <ubuntu22-ip> | Out-File -Encoding ascii `
+  "$env:GARM_ROOT\secrets\ubuntu22-known_hosts"
+```
+
+Write the Windows11Runner administrator password (single line, no trailing
+newline) to `secrets\windows11-runner-password.txt`.
+
+Restrict the whole `secrets\` directory so only the account that runs GARM can
+read it:
+
+```powershell
+icacls "$env:GARM_ROOT\secrets" /inheritance:r /grant:r "$env:USERNAME:(OI)(CI)R"
+```
+
+### 5. Register the provider with GARM
+
+Add the `[provider.external]` block from
+[examples/garm-provider.fragment.toml](examples/garm-provider.fragment.toml)
+to the GARM `config.toml`, replacing `<GARM_ROOT>` with your root:
+
+```toml
+[[provider]]
+name = "hyperv_fixed"
+provider_type = "external"
+description = "Three checkpointed Windows Hyper-V guests; idle guests are suspended"
+
+[provider.external]
+provider_executable = "<GARM_ROOT>\\providers\\garm-provider-hyperv.exe"
+config_file = "<GARM_ROOT>\\config\\garm-provider-hyperv.toml"
+exec_timeout_seconds = 900
+```
+
+The `interface_version` is intentionally omitted: GARM then selects v0.1.0,
+avoiding the current v0.1.1 ListInstances adapter regression. Do not set it to
+v0.1.1.
+
+### 6. Run the readiness preflight
+
+From the repository root,
+[scripts/preflight.ps1](scripts/preflight.ps1) verifies that the session is
+elevated, Go is on PATH, the provider executable exists, and each of the three
+guests is idle, has key-value exchange enabled, and has its baseline
+checkpoint:
+
+```powershell
+.\scripts\preflight.ps1
+```
+
+It prints a JSON report with `Ready: true`/`false` and the list of issues, and
+exits non-zero when anything is wrong. Pass `-CheckpointName` if your baseline
+checkpoints are not named `garm-clean`, and `-ProviderExecutable` (or
+`$env:GARM_PROVIDER_EXECUTABLE`) to check a different executable.
+
+### 7. Create runner pools
+
+Create a Linux/amd64 pool for each Ubuntu guest and a Windows/amd64 pool for
+Windows11Runner, all using `provider_name = "hyperv_fixed"`. Set each
+`runner_bootstrap_timeout` to at least 900 seconds — greater than or equal to
+`bootstrap_timeout_seconds` and `exec_timeout_seconds`.
+
+### 8. Verify the installation
+
+Smoke-test the provider binary directly; it must return the provider version
+without touching a guest:
+
+```powershell
+$env:GARM_COMMAND = "GetVersion"
+$env:GARM_CONTROLLER_ID = "verification-controller"
+$env:GARM_PROVIDER_CONFIG_FILE = "$env:GARM_ROOT\config\garm-provider-hyperv.toml"
+& "$env:GARM_ROOT\providers\garm-provider-hyperv.exe"
+
+Get-VM -Name '<one configured VM>' | Select-Object Name,State,Notes
+```
+
+Then create one test pool runner and confirm the provider returns the
+configured VM name as ProviderID, the guest reports runner bootstrap status to
+GARM, and idle cleanup leaves the VM in Saved or Paused state after
+Suspend-VM. Do not test RemoveAllInstances until the three entries and
+checkpoints are confirmed: it suspends every guest currently allocated to this
+controller.
 
 ## Lifecycle
 
@@ -108,22 +240,6 @@ next CreateInstance
 Stop also calls Suspend-VM, but standard GARM idle reclaim currently uses
 DeleteInstance, so both paths intentionally suspend instead of delete.
 
-## Targeted verification
-
-After building and filling the real configuration, run the following as the
-same account that runs GARM:
-
-```powershell
-$env:GARM_COMMAND = "GetVersion"
-$env:GARM_CONTROLLER_ID = "verification-controller"
-$env:GARM_PROVIDER_CONFIG_FILE = "C:\garm\config\garm-provider-hyperv.toml"
-& C:\garm\providers\garm-provider-hyperv.exe
-
-Get-VM -Name '<one configured VM>' | Select-Object Name,State,Notes
-```
-
-Then create one test pool runner. Verify the provider returns the configured
-VM name as ProviderID, the guest reports runner bootstrap status to GARM, and
-idle cleanup leaves the VM in Saved or Paused state after Suspend-VM. Do not
-test RemoveAllInstances until the three entries and checkpoints are confirmed:
-it suspends every guest currently allocated to this controller.
+Each VM's existing human-readable Notes text is preserved. The provider adds a
+short JSON allocation marker while GARM owns the guest, then removes only that
+marker after a successful Suspend-VM.

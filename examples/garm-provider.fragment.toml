@@ -1,6 +1,8 @@
 # Add this block to the GARM config.toml running on this Windows Hyper-V host.
 # The external interface version is intentionally omitted: GARM then selects
 # v0.1.0, avoiding the current v0.1.1 ListInstances adapter regression.
+# Replace every <GARM_ROOT> placeholder with the same installation root used in
+# examples/garm-provider-hyperv.toml (C:\garm on the reference host).
 
 [[provider]]
 name = "hyperv_fixed"
@@ -8,6 +10,6 @@ provider_type = "external"
 description = "Three checkpointed Windows Hyper-V guests; idle guests are suspended"
 
 [provider.external]
-provider_executable = "C:\\garm\\providers\\garm-provider-hyperv.exe"
-config_file = "C:\\garm\\config\\garm-provider-hyperv.toml"
+provider_executable = "<GARM_ROOT>\\providers\\garm-provider-hyperv.exe"
+config_file = "<GARM_ROOT>\\config\\garm-provider-hyperv.toml"
 exec_timeout_seconds = 900

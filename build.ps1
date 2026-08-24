@@ -1,6 +1,11 @@
 [CmdletBinding()]
 param(
-    [string]$OutputPath = "C:\garm\providers\garm-provider-hyperv.exe",
+    # Root of the GARM installation, taken from $env:GARM_ROOT when unset.
+    # When provided, the default -OutputPath is <GarmRoot>\providers\garm-provider-hyperv.exe.
+    [string]$GarmRoot = $env:GARM_ROOT,
+    # Where to write the executable. Defaults to <GarmRoot>\providers\garm-provider-hyperv.exe
+    # when -GarmRoot is set, otherwise bin\garm-provider-hyperv.exe inside this repo.
+    [string]$OutputPath = $(if ($GarmRoot) { Join-Path $GarmRoot "providers\garm-provider-hyperv.exe" } else { Join-Path $PSScriptRoot "bin\garm-provider-hyperv.exe" }),
     [string]$Version = "v0.1.0"
 )
 

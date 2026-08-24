@@ -16,7 +16,11 @@ go vet ./...                          # check common Go mistakes
 .\scripts\preflight.ps1              # verify a configured Hyper-V host
 ```
 
-`build.ps1` downloads modules and writes the executable to `C:\garm\providers\garm-provider-hyperv.exe` unless `-OutputPath` overrides it. Run it from an elevated PowerShell session on the Hyper-V host.
+`build.ps1` downloads modules and writes the executable to
+`<GARM_ROOT>\providers\garm-provider-hyperv.exe` when `-GarmRoot` (or
+`$env:GARM_ROOT`) is set, otherwise to `bin\garm-provider-hyperv.exe` inside the
+repo; `-OutputPath` overrides both. Run it from an elevated PowerShell session on
+the Hyper-V host.
 
 ## Coding Style & Naming Conventions
 

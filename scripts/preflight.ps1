@@ -1,9 +1,20 @@
 [CmdletBinding()]
 param(
-    [string]$CheckpointName = "garm-clean"
+    [string]$CheckpointName = "garm-clean",
+    # Provider executable to verify, taken from $env:GARM_PROVIDER_EXECUTABLE when unset.
+    # Falls back to <GARM_ROOT>\providers\garm-provider-hyperv.exe when $env:GARM_ROOT is
+    # set, otherwise ..\bin\garm-provider-hyperv.exe next to this script.
+    [string]$ProviderExecutable = $env:GARM_PROVIDER_EXECUTABLE
 )
 
 $ErrorActionPreference = "Stop"
+if (-not $ProviderExecutable) {
+    if ($env:GARM_ROOT) {
+        $ProviderExecutable = Join-Path $env:GARM_ROOT "providers\garm-provider-hyperv.exe"
+    } else {
+        $ProviderExecutable = Join-Path $PSScriptRoot "..\bin\garm-provider-hyperv.exe"
+    }
+}
 $expectedVMs = @(
     @{ Name = "Ubuntu22Runner"; OSType = "linux" },
     @{ Name = "Ubuntu24Runner"; OSType = "linux" },
@@ -61,14 +72,14 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
     $issues.Add("Go is not on PATH")
 }
-if (-not (Test-Path -LiteralPath "C:\garm\providers\garm-provider-hyperv.exe")) {
-    $issues.Add("provider executable is missing")
+if (-not (Test-Path -LiteralPath $ProviderExecutable)) {
+    $issues.Add("provider executable is missing: $ProviderExecutable")
 }
 
 [PSCustomObject]@{
     Host = $env:COMPUTERNAME
     Elevated = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-    ProviderExecutable = "C:\garm\providers\garm-provider-hyperv.exe"
+    ProviderExecutable = $ProviderExecutable
     Guests = @($results)
     Ready = $issues.Count -eq 0
     Issues = @($issues)
