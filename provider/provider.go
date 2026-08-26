@@ -20,7 +20,14 @@ import (
 	"github.com/cloudbase/garm-provider-hyperv/config"
 )
 
-var _ execution.ExternalProvider = (*HyperV)(nil)
+type NamedInstanceDeleter interface {
+	DeleteInstanceWithName(ctx context.Context, instanceID, instanceName string) error
+}
+
+var (
+	_ execution.ExternalProvider = (*HyperV)(nil)
+	_ NamedInstanceDeleter       = (*HyperV)(nil)
+)
 
 // Version is set at build time with -ldflags "-X .../provider.Version=vX.Y.Z".
 var Version = "v0.0.0-unknown"
@@ -225,6 +232,13 @@ func renderLinuxRunnerScript(bootstrap commonParams.BootstrapInstance, tool comm
 }
 
 func (p *HyperV) DeleteInstance(ctx context.Context, instance string) error {
+	return runnerErrors.NewBadRequestError("runner name is required for safe Hyper-V instance deletion")
+}
+
+func (p *HyperV) DeleteInstanceWithName(ctx context.Context, instance, instanceName string) error {
+	if strings.TrimSpace(instanceName) == "" {
+		return runnerErrors.NewBadRequestError("runner name is required for safe Hyper-V instance deletion")
+	}
 	return p.withLock(ctx, func() error {
 		vm, _, metadata, err := p.findAllocatedVM(ctx, instance)
 		if err != nil {
@@ -232,6 +246,9 @@ func (p *HyperV) DeleteInstance(ctx context.Context, instance string) error {
 				return nil
 			}
 			return err
+		}
+		if metadata.RunnerName != instanceName {
+			return nil
 		}
 		if err := p.client.Suspend(ctx, vm.Name); err != nil {
 			return fmt.Errorf("suspend guest %q: %w", vm.Name, err)

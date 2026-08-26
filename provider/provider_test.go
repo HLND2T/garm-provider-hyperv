@@ -43,7 +43,7 @@ func TestCreateThenDeleteSuspendsAndReleasesGuest(t *testing.T) {
 		t.Fatalf("allocation metadata = %#v, allocated=%t, err=%v", metadata, allocated, err)
 	}
 
-	if err := provider.DeleteInstance(context.Background(), instance.ProviderID); err != nil {
+	if err := provider.DeleteInstanceWithName(context.Background(), instance.ProviderID, instance.Name); err != nil {
 		t.Fatal(err)
 	}
 	if client.suspended != "runner-01" {
@@ -51,6 +51,93 @@ func TestCreateThenDeleteSuspendsAndReleasesGuest(t *testing.T) {
 	}
 	if client.vms[0].Notes != "reserved for CI" {
 		t.Fatalf("Notes after delete = %q, want original operator note", client.vms[0].Notes)
+	}
+}
+
+func TestStaleNamedDeleteDoesNotSuspendReallocatedGuest(t *testing.T) {
+	notes := mustNotes(t, "garm-runner-new")
+	client := &fakeClient{vms: []vmInfo{
+		{Name: "runner-01", State: "Running", Notes: notes},
+		{Name: "runner-02", State: "Off"},
+		{Name: "runner-03", State: "Off"},
+	}}
+	provider := testProvider(t, client)
+
+	err := provider.DeleteInstanceWithName(context.Background(), "runner-01", "garm-runner-old")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.suspended != "" {
+		t.Fatalf("Suspend() VM = %q, want no suspension", client.suspended)
+	}
+	if client.vms[0].Notes != notes {
+		t.Fatalf("Notes after stale delete = %q, want %q", client.vms[0].Notes, notes)
+	}
+}
+
+func TestDeleteRetryDoesNotSuspendGuestReallocatedToNewRunner(t *testing.T) {
+	client := &fakeClient{vms: []vmInfo{
+		{Name: "runner-01", State: "Off"},
+		{Name: "runner-02", State: "Off"},
+		{Name: "runner-03", State: "Off"},
+	}}
+	provider := testProvider(t, client)
+	ctx := context.Background()
+
+	first, err := provider.CreateInstance(ctx, commonParams.BootstrapInstance{
+		Name:   "garm-runner-old",
+		PoolID: "pool-a",
+		OSType: commonParams.Windows,
+		OSArch: commonParams.Amd64,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := provider.DeleteInstanceWithName(ctx, first.ProviderID, first.Name); err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := provider.CreateInstance(ctx, commonParams.BootstrapInstance{
+		Name:   "garm-runner-new",
+		PoolID: "pool-a",
+		OSType: commonParams.Windows,
+		OSArch: commonParams.Amd64,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.ProviderID != first.ProviderID {
+		t.Fatalf("reallocated ProviderID = %q, want %q", second.ProviderID, first.ProviderID)
+	}
+	client.suspended = ""
+
+	if err := provider.DeleteInstanceWithName(ctx, first.ProviderID, first.Name); err != nil {
+		t.Fatal(err)
+	}
+	if client.suspended != "" {
+		t.Fatalf("stale retry suspended %q, want no suspension", client.suspended)
+	}
+	metadata, allocated, err := allocationFromNotes(client.vms[0].Notes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !allocated || metadata.RunnerName != second.Name {
+		t.Fatalf("allocation after stale retry = %#v, allocated=%t; want %q", metadata, allocated, second.Name)
+	}
+}
+
+func TestNamedDeleteRequiresRunnerName(t *testing.T) {
+	client := &fakeClient{vms: []vmInfo{
+		{Name: "runner-01", State: "Running", Notes: mustNotes(t, "garm-runner-new")},
+	}}
+	provider := testProvider(t, client)
+
+	err := provider.DeleteInstanceWithName(context.Background(), "runner-01", "")
+	if err == nil || !strings.Contains(err.Error(), "runner name") {
+		t.Fatalf("DeleteInstanceWithName() error = %v, want missing runner name", err)
+	}
+	if client.suspended != "" {
+		t.Fatalf("Suspend() VM = %q, want no suspension", client.suspended)
 	}
 }
 
