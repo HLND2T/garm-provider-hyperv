@@ -225,10 +225,14 @@ func renderLinuxRunnerScript(bootstrap commonParams.BootstrapInstance, tool comm
 	if err != nil {
 		return nil, fmt.Errorf("render Linux runner install script: %w", err)
 	}
+	// The install templates are embedded as Go raw-string constants and can carry
+	// CRLF endings, which bash rejects on a Linux guest (a trailing CR turns every
+	// line into a bad command). The script is piped to bash over SSH, so emit LF.
+	rendered := strings.ReplaceAll(string(script), "\r\n", "\n")
 	// The upstream default template has one legacy literal in its optional
 	// SELinux branch. Keep that path tied to the configured guest account too.
 	guestHome := "/home/" + vm.SSHUsername + "/"
-	return []byte(strings.ReplaceAll(string(script), "/home/runner/", guestHome)), nil
+	return []byte(strings.ReplaceAll(rendered, "/home/runner/", guestHome)), nil
 }
 
 func (p *HyperV) DeleteInstance(ctx context.Context, instance string) error {

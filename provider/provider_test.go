@@ -288,6 +288,9 @@ func TestRenderLinuxRunnerScriptUsesConfiguredGuestUser(t *testing.T) {
 	if strings.Contains(rendered, "/home/runner/") {
 		t.Fatalf("rendered script still contains the default runner home: %q", rendered)
 	}
+	if strings.Contains(rendered, "\r") {
+		t.Fatalf("rendered Linux script must use LF line endings, got a CR")
+	}
 }
 
 func testProvider(t *testing.T, client *fakeClient) *HyperV {
