@@ -20,6 +20,8 @@ bootstrap script: PowerShell Direct for Windows and authenticated SSH for Linux.
 - Ubuntu22Runner and Ubuntu24Runner are x64 Linux guests. Each needs OpenSSH
   server, a non-interactive sudo-capable runner user, and a dedicated key
   accepted by that user. The SSH host key must be pinned in a known_hosts file.
+  Set `ssh_host_key_alias` for each Linux guest so the pin is looked up by a
+  stable alias rather than the guest's DHCP address.
 - If Hyper-V does not expose a Linux guest address through key-value exchange
   (as with this host's Default Switch), the provider resolves the guest IPv4
   address from the host's IPv4 neighbor table by matching the virtual NIC MAC.
@@ -155,7 +157,9 @@ names; substitute:
 - `ssh_username` / `windows_guest_username` with the real guest accounts;
 - `checkpoint` if your baseline checkpoints are named differently;
 - `os_version` / `os_arch` if a guest differs from the defaults;
-- the credential paths only if you store secrets elsewhere.
+- the credential paths only if you store secrets elsewhere;
+- `ssh_host_key_alias` for each Linux guest (recommended; the VM name works
+  well). It must match the first field of that guest's known_hosts entry.
 
 `bootstrap_timeout_seconds` must not exceed the `runner_bootstrap_timeout` you
 configure in GARM (step 7).
@@ -170,13 +174,25 @@ For each Ubuntu guest, generate a dedicated SSH key pair and add the public
 half to the runner user's `authorized_keys`. Copy the private key to
 `secrets\ubuntu22-runner-ed25519` (and `ubuntu24-runner-ed25519`).
 
-Each Ubuntu guest's `known_hosts` file pins its SSH host key. Capture it while
-the guest is temporarily running — before you take the clean checkpoint:
+Each Ubuntu guest's `known_hosts` file pins its SSH host key. Prefer a stable
+alias over the guest's DHCP address: set `ssh_host_key_alias` to a name such as
+`Ubuntu22Runner`, and write the known_hosts entry with that alias as its first
+field. The provider passes the alias to ssh as `HostKeyAlias`, so the entry
+keeps matching after the Default Switch assigns a new address.
+
+Capture the key while the guest is temporarily running — before you take the
+clean checkpoint — and rewrite the scanned host field to the alias:
 
 ```powershell
-ssh-keyscan -t ed25519 <ubuntu22-ip> | Out-File -Encoding ascii `
-  "$env:GARM_ROOT\secrets\ubuntu22-known_hosts"
+$scan = ssh-keyscan -t ed25519 <ubuntu22-ip> | Select-String ' ssh-ed25519 '
+"Ubuntu22Runner " + ($scan.Line -replace '^\S+\s+', '') |
+  Out-File -Encoding ascii "$env:GARM_ROOT\secrets\ubuntu22-known_hosts"
 ```
+
+For multiple guests that share one known_hosts file, append one line per
+alias. If `ssh_host_key_alias` is omitted, the provider falls back to legacy
+IP-based verification and known_hosts must be refreshed whenever a guest's
+address changes.
 
 Write the Windows11Runner administrator password (single line, no trailing
 newline) to `secrets\windows11-runner-password.txt`.
@@ -198,7 +214,7 @@ to the GARM `config.toml`, replacing `<GARM_ROOT>` with your root:
 [[provider]]
 name = "hyperv_fixed"
 provider_type = "external"
-description = "Three checkpointed Windows Hyper-V guests; idle guests are suspended"
+description = "Four checkpointed Windows Hyper-V guests; idle guests are suspended"
 
 [provider.external]
 provider_executable = "<GARM_ROOT>\\providers\\garm-provider-hyperv.exe"

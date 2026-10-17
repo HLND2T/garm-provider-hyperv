@@ -43,7 +43,12 @@ type VM struct {
 	SSHUsername              string `toml:"ssh_username"`
 	SSHPrivateKeyFile        string `toml:"ssh_private_key_file"`
 	SSHKnownHostsFile        string `toml:"ssh_known_hosts_file"`
-	SSHPort                  int    `toml:"ssh_port"`
+	// SSHHostKeyAlias pins the guest's SSH host key under a stable name in
+	// known_hosts instead of the guest's dynamic IP address. When set, the
+	// provider passes it to ssh as HostKeyAlias. Leave empty to keep the
+	// legacy IP-based lookup.
+	SSHHostKeyAlias string `toml:"ssh_host_key_alias"`
+	SSHPort         int    `toml:"ssh_port"`
 }
 
 func NewConfig(path string) (*Config, error) {
@@ -92,6 +97,11 @@ func (c *Config) Validate() error {
 			} {
 				if err := validateFile(field, path); err != nil {
 					return fmt.Errorf("linux vm %q: %w", vm.Name, err)
+				}
+			}
+			if alias := strings.TrimSpace(vm.SSHHostKeyAlias); alias != "" {
+				if strings.ContainsAny(alias, " \t\r\n,#*?:") {
+					return fmt.Errorf("linux vm %q ssh_host_key_alias %q must not contain whitespace, commas, '#', ':' or wildcards", vm.Name, alias)
 				}
 			}
 		default:

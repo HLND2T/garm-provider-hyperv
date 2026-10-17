@@ -54,6 +54,52 @@ func TestConfigValidateRequiresWindowsCredentialsOnVM(t *testing.T) {
 	}
 }
 
+func TestConfigValidateSSHHostKeyAlias(t *testing.T) {
+	keyFile := filepath.Join(t.TempDir(), "id_rsa")
+	knownHostsFile := filepath.Join(t.TempDir(), "known_hosts")
+	for _, path := range []string{keyFile, knownHostsFile} {
+		if err := os.WriteFile(path, []byte("placeholder\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tests := []struct {
+		name    string
+		alias   string
+		wantErr bool
+	}{
+		{name: "empty preserves IP lookup", alias: ""},
+		{name: "stable name", alias: "Ubuntu24Runner"},
+		{name: "surrounding whitespace is trimmed", alias: " Ubuntu24Runner "},
+		{name: "interior whitespace", alias: "Ubuntu 24Runner", wantErr: true},
+		{name: "comma", alias: "Ubuntu24Runner,other", wantErr: true},
+		{name: "colon", alias: "Ubuntu24Runner:22", wantErr: true},
+		{name: "wildcard", alias: "Ubuntu24*", wantErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := Config{VMs: []VM{{
+				Name:              "runner-01",
+				Checkpoint:        "garm-clean",
+				OSType:            "linux",
+				SSHUsername:       "runner",
+				SSHPrivateKeyFile: keyFile,
+				SSHKnownHostsFile: knownHostsFile,
+				SSHHostKeyAlias:   test.alias,
+			}}}
+
+			err := cfg.Validate()
+			if (err != nil) != test.wantErr {
+				t.Fatalf("Validate() error = %v, wantErr %t", err, test.wantErr)
+			}
+			if test.wantErr && !strings.Contains(err.Error(), "ssh_host_key_alias") {
+				t.Fatalf("Validate() error = %v, want ssh_host_key_alias error", err)
+			}
+		})
+	}
+}
+
 func TestExampleFilesUseValidTOML(t *testing.T) {
 	var providerConfig Config
 	if _, err := toml.DecodeFile(filepath.Join("..", "examples", "garm-provider-hyperv.toml"), &providerConfig); err != nil {

@@ -201,6 +201,7 @@ func TestCreateSelectsLinuxGuestAndUsesSSHBootstrap(t *testing.T) {
 		SSHUsername:       "runner",
 		SSHPrivateKeyFile: "C:\\keys\\runner",
 		SSHKnownHostsFile: "C:\\keys\\known_hosts",
+		SSHHostKeyAlias:   "ubuntu-fixed-alias",
 	}
 
 	instance, err := provider.CreateInstance(context.Background(), commonParams.BootstrapInstance{
@@ -217,6 +218,9 @@ func TestCreateSelectsLinuxGuestAndUsesSSHBootstrap(t *testing.T) {
 	}
 	if client.bootstrapped != "172.20.1.25" {
 		t.Fatalf("Linux bootstrap target = %q, want guest IPv4", client.bootstrapped)
+	}
+	if client.bootstrapAlias != "ubuntu-fixed-alias" {
+		t.Fatalf("Linux host key alias = %q, want ubuntu-fixed-alias", client.bootstrapAlias)
 	}
 }
 
@@ -329,10 +333,11 @@ func mustNotes(t *testing.T, runnerName string) string {
 }
 
 type fakeClient struct {
-	vms          []vmInfo
-	prepared     string
-	suspended    string
-	bootstrapped string
+	vms            []vmInfo
+	prepared       string
+	suspended      string
+	bootstrapped   string
+	bootstrapAlias string
 }
 
 func (f *fakeClient) ListVMs(_ context.Context, _ []string) ([]vmInfo, error) {
@@ -371,8 +376,9 @@ func (f *fakeClient) BootstrapWindowsGuest(_ context.Context, name, _, _, _ stri
 	return nil
 }
 
-func (f *fakeClient) BootstrapLinuxGuest(_ context.Context, address string, _ int, _, _, _, _ string) error {
+func (f *fakeClient) BootstrapLinuxGuest(_ context.Context, address string, _ int, _, _, _, hostKeyAlias, _ string) error {
 	f.bootstrapped = address
+	f.bootstrapAlias = hostKeyAlias
 	return nil
 }
 

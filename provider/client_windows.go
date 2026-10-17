@@ -225,18 +225,9 @@ func sanitizeWindowsBootstrapScript(script string) string {
 	return setExecutionPolicyCommand.ReplaceAllString(script, "# execution policy is supplied by the provider\n")
 }
 
-func (c *windowsClient) BootstrapLinuxGuest(ctx context.Context, address string, port int, username, privateKeyFile, knownHostsFile, script string) error {
+func (c *windowsClient) BootstrapLinuxGuest(ctx context.Context, address string, port int, username, privateKeyFile, knownHostsFile, hostKeyAlias, script string) error {
 	for {
-		command := exec.CommandContext(ctx, c.sshPath,
-			"-p", strconv.Itoa(port),
-			"-i", privateKeyFile,
-			"-o", "BatchMode=yes",
-			"-o", "ConnectTimeout=30",
-			"-o", "IdentitiesOnly=yes",
-			"-o", "StrictHostKeyChecking=yes",
-			"-o", "UserKnownHostsFile="+knownHostsFile,
-			username+"@"+address,
-			"sudo -n /bin/bash -s")
+		command := exec.CommandContext(ctx, c.sshPath, linuxSSHArgs(address, port, username, privateKeyFile, knownHostsFile, hostKeyAlias)...)
 		command.Stdin = strings.NewReader(script)
 		rawOutput, err := command.CombinedOutput()
 		if err == nil {
@@ -260,6 +251,26 @@ func (c *windowsClient) BootstrapLinuxGuest(ctx context.Context, address string,
 		case <-timer.C:
 		}
 	}
+}
+
+// linuxSSHArgs builds the SSH invocation for a Linux guest bootstrap. A
+// non-empty hostKeyAlias makes ssh look up the pinned host key by that stable
+// name instead of the guest's current address, so address changes do not
+// invalidate known_hosts.
+func linuxSSHArgs(address string, port int, username, privateKeyFile, knownHostsFile, hostKeyAlias string) []string {
+	args := []string{
+		"-p", strconv.Itoa(port),
+		"-i", privateKeyFile,
+		"-o", "BatchMode=yes",
+		"-o", "ConnectTimeout=30",
+		"-o", "IdentitiesOnly=yes",
+		"-o", "StrictHostKeyChecking=yes",
+		"-o", "UserKnownHostsFile=" + knownHostsFile,
+	}
+	if hostKeyAlias != "" {
+		args = append(args, "-o", "HostKeyAlias="+hostKeyAlias)
+	}
+	return append(args, username+"@"+address, "sudo -n /bin/bash -s")
 }
 
 func redactBootstrapOutput(output string) string {

@@ -29,6 +29,10 @@ os_arch = "amd64"
 ssh_username = "REPLACE-LINUX-RUNNER-USERNAME"
 ssh_private_key_file = "<GARM_ROOT>\\secrets\\ubuntu22-runner-ed25519"
 ssh_known_hosts_file = "<GARM_ROOT>\\secrets\\ubuntu22-known_hosts"
+# Optional but recommended: look up the pinned host key by this stable name
+# instead of the guest's DHCP address, so address changes do not break SSH
+# bootstrap. The known_hosts entry must start with this alias.
+# ssh_host_key_alias = "Ubuntu22Runner"
 ssh_port = 22
 
 [[vm]]
@@ -41,6 +45,10 @@ os_arch = "amd64"
 ssh_username = "REPLACE-LINUX-RUNNER-USERNAME"
 ssh_private_key_file = "<GARM_ROOT>\\secrets\\ubuntu24-runner-ed25519"
 ssh_known_hosts_file = "<GARM_ROOT>\\secrets\\ubuntu24-known_hosts"
+# Optional but recommended: look up the pinned host key by this stable name
+# instead of the guest's DHCP address, so address changes do not break SSH
+# bootstrap. The known_hosts entry must start with this alias.
+# ssh_host_key_alias = "Ubuntu24Runner"
 ssh_port = 22
 
 [[vm]]

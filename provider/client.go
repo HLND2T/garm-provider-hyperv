@@ -17,7 +17,7 @@ type Client interface {
 	ResumeOrStart(context.Context, string) error
 	SetNotes(context.Context, string, string) error
 	BootstrapWindowsGuest(context.Context, string, string, string, string) error
-	BootstrapLinuxGuest(context.Context, string, int, string, string, string, string) error
+	BootstrapLinuxGuest(context.Context, string, int, string, string, string, string, string) error
 }
 
 type vmInfo struct {

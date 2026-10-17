@@ -159,7 +159,8 @@ func (p *HyperV) CreateInstance(ctx context.Context, bootstrap commonParams.Boot
 			if err != nil {
 				return fmt.Errorf("resolve Linux guest %q address: %w", vm.Name, err)
 			}
-			if err := p.client.BootstrapLinuxGuest(bootstrapCtx, address, vmCfg.SSHPortOrDefault(), vmCfg.SSHUsername, vmCfg.SSHPrivateKeyFile, vmCfg.SSHKnownHostsFile, string(script)); err != nil {
+			hostKeyAlias := strings.TrimSpace(vmCfg.SSHHostKeyAlias)
+			if err := p.client.BootstrapLinuxGuest(bootstrapCtx, address, vmCfg.SSHPortOrDefault(), vmCfg.SSHUsername, vmCfg.SSHPrivateKeyFile, vmCfg.SSHKnownHostsFile, hostKeyAlias, string(script)); err != nil {
 				return fmt.Errorf("bootstrap Linux guest %q: %w", vm.Name, err)
 			}
 		}
